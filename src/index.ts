@@ -1,5 +1,5 @@
 import "dotenv/config";
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 
 const port: number = Number(process.env.PORT ?? 3000);
 const app: FastifyInstance = Fastify({ logger: true });
