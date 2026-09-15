@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify, { FastifyInstance } from "fastify";
 
 const port: number = Number(process.env.PORT ?? 3000);
