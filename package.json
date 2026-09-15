@@ -1,15 +1,11 @@
 {
   "name": "review-router",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
-  "keywords": [],
-  "author": "",
   "license": "MIT",
   "devEngines": {
     "packageManager": {
