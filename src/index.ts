@@ -1,7 +1,7 @@
-import Fastify from "fastify";
+import Fastify, { FastifyInstance } from "fastify";
 
-const port = Number(process.env.PORT ?? 3000);
-const app = Fastify({ logger: true });
+const port: number = Number(process.env.PORT ?? 3000);
+const app: FastifyInstance = Fastify({ logger: true });
 
 try {
   await app.listen({ port });
