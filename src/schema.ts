@@ -5,7 +5,7 @@ export const repos = pgTable("repos", {
   name: text("name").notNull().unique(),
 });
 
-export const pull_requests = pgTable(
+export const pullRequests = pgTable(
   "pull_requests",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
