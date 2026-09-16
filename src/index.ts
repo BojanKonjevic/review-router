@@ -23,18 +23,18 @@ app.post("/webhooks/github", (req: FastifyRequest, res: FastifyReply) => {
   const received = req.headers["x-hub-signature-256"];
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret || typeof received !== "string") {
-    return res.status(401).send({ ok: false });
+    return res.code(401).send({ ok: false });
   }
   const expected =
     "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
   if (Buffer.byteLength(expected) !== Buffer.byteLength(received)) {
-    return res.status(401).send({ ok: false });
+    return res.code(401).send({ ok: false });
   }
   if (timingSafeEqual(Buffer.from(expected), Buffer.from(received))) {
     app.log.info({ event, delivery, rawBody });
-    return res.status(200).send({ ok: true });
+    return res.code(200).send({ ok: true });
   } else {
-    return res.status(401).send({ ok: false });
+    return res.code(401).send({ ok: false });
   }
 });
 
