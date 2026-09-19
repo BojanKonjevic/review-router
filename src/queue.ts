@@ -6,7 +6,7 @@ if (!process.env.REDIS_URL) throw new Error("REDIS_URL is not defined");
 export const redis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
 });
-export const prEvents = new Queue<PrEventJob>("pr_events", {
+export const prEvents = new Queue<PrEventJob>("pr-events", {
   connection: redis,
 });
 

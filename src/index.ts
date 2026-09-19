@@ -1,4 +1,5 @@
 import "dotenv/config";
+import "./worker.js";
 import Fastify, {
   type FastifyInstance,
   type FastifyRequest,
