@@ -5,7 +5,7 @@ import Fastify, {
   type FastifyReply,
 } from "fastify";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { PrEventJob, prEvents } from "./queue.js";
+import { type PrEventJob, prEvents } from "./queue.js";
 
 const port: number = Number(process.env.PORT ?? 3000);
 const app: FastifyInstance = Fastify({ logger: true });
@@ -48,7 +48,7 @@ app.post("/webhooks/github", async (req: FastifyRequest, res: FastifyReply) => {
     await prEvents.add("pr-opened", prEventJob, {
       jobId: prEventJob.deliveryId,
     });
-    app.log.info({ event, delivery, rawBody });
+    app.log.info({ event, delivery, prEventJob });
     return res.code(200).send({ ok: true });
   } else {
     return res.code(401).send({ ok: false });
