@@ -17,9 +17,11 @@
   "packageManager": "pnpm@12.4.1",
   "type": "module",
   "dependencies": {
+    "bullmq": "^6.3.7",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.4",
+    "ioredis": "^6.0.0",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
