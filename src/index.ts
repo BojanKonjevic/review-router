@@ -5,6 +5,7 @@ import Fastify, {
   type FastifyReply,
 } from "fastify";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { PrEventJob } from "./queue.js";
 
 const port: number = Number(process.env.PORT ?? 3000);
 const app: FastifyInstance = Fastify({ logger: true });
