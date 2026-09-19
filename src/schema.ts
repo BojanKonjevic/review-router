@@ -9,6 +9,9 @@ export const pullRequests = pgTable(
   "pull_requests",
   {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    reviewerId: integer("reviewer_id")
+      .notNull()
+      .references(() => reviewers.id),
     repoId: integer("repo_id")
       .notNull()
       .references(() => repos.id),
@@ -25,4 +28,10 @@ export const deliveries = pgTable("deliveries", {
   id: text("id").primaryKey(),
   payload: text("payload").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const reviewers = pgTable("reviewers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull().unique(),
+  load: integer("load").notNull().default(0),
 });
