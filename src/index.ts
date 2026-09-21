@@ -44,6 +44,7 @@ app.post("/webhooks/github", async (req: FastifyRequest, res: FastifyReply) => {
       repo: body.repository.full_name,
       number: body.pull_request.number,
       title: body.pull_request.title,
+      action: body.action,
       body: body.pull_request.body,
     };
     await prEvents.add("pr-opened", prEventJob, {
