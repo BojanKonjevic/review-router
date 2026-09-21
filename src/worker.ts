@@ -3,7 +3,7 @@ import { type Job, Worker } from "bullmq";
 import { db } from "./db/index.js";
 import { deliveries, pullRequests, repos, reviewers } from "./schema.js";
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 async function processor(job: Job<PrEventJob>) {
   const inserted = await db
@@ -22,6 +22,38 @@ async function processor(job: Job<PrEventJob>) {
   const locked = await redis.set("lock:assign", token, "PX", 5000, "NX");
   if (!locked) throw new Error("Failed to acquire lock");
   try {
+    if (job.data.action === "closed") {
+      const repo = await db
+        .select()
+        .from(repos)
+        .where(eq(repos.name, job.data.repo));
+      if (!repo[0]) throw new Error("Repo not found.");
+      const pr = await db
+        .select()
+        .from(pullRequests)
+        .where(
+          and(
+            eq(pullRequests.repoId, repo[0].id),
+            eq(pullRequests.number, job.data.number),
+          ),
+        );
+      if (!pr || !pr[0].reviewerId || pr[0].state === "closed") return;
+      await db
+        .update(pullRequests)
+        .set({ state: "closed" })
+        .where(eq(pullRequests.id, pr[0].id));
+      const rev = await db
+        .select()
+        .from(reviewers)
+        .where(eq(reviewers.id, pr[0].reviewerId));
+      if (rev) {
+        await db
+          .update(reviewers)
+          .set({ load: rev[0].load - 1 })
+          .where(eq(reviewers.id, pr[0].reviewerId));
+      }
+      return;
+    }
     const reviewer = await db
       .select()
       .from(reviewers)
