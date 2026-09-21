@@ -18,6 +18,7 @@ export const pullRequests = pgTable(
     number: integer("number").notNull(),
     title: text("title").notNull(),
     body: text("body"),
+    state: text("state").notNull().default("open"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

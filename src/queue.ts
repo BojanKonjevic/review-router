@@ -16,5 +16,6 @@ export interface PrEventJob {
   repo: string;
   number: number;
   title: string;
+  action: string;
   body: string | null;
 }

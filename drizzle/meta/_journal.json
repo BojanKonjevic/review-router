@@ -15,6 +15,13 @@
       "when": 1789832195923,
       "tag": "0001_add_reviewers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790012466863,
+      "tag": "0002_pr_state",
+      "breakpoints": true
     }
   ]
 }
