@@ -1,11 +1,43 @@
-import { type PrEventJob, redis } from "./queue.js";
+import { type PrEventJob, redis, prEvents, ReconcileJob } from "./queue.js";
 import { type Job, Worker } from "bullmq";
 import { db } from "./db/index.js";
 import { deliveries, pullRequests, repos, reviewers } from "./schema.js";
 import { randomUUID } from "node:crypto";
-import { eq, and } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
 
-async function processor(job: Job<PrEventJob>) {
+async function processor(job: Job<PrEventJob | ReconcileJob>) {
+  if ("kind" in job.data) {
+    const token = randomUUID();
+    const locked = await redis.set("lock:assign", token, "PX", 5000, "NX");
+    if (!locked) throw new Error("Failed to acquire lock");
+    try {
+      const rows = await db
+        .select({
+          reviewerId: pullRequests.reviewerId,
+          n: count(),
+        })
+        .from(pullRequests)
+        .where(eq(pullRequests.state, "open"))
+        .groupBy(pullRequests.reviewerId);
+      const loads = new Map(rows.map((r) => [r.reviewerId, r.n]));
+      const all = await db.select().from(reviewers);
+      for (const r of all) {
+        await db
+          .update(reviewers)
+          .set({ load: loads.get(r.id) ?? 0 })
+          .where(eq(reviewers.id, r.id));
+      }
+    } finally {
+      await redis.eval(
+        "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
+        1,
+        "lock:assign",
+        token,
+      );
+    }
+    return;
+  }
+
   const inserted = await db
     .insert(deliveries)
     .values({
@@ -97,3 +129,8 @@ async function processor(job: Job<PrEventJob>) {
 }
 
 const worker = new Worker("pr-events", processor, { connection: redis });
+await prEvents.upsertJobScheduler(
+  "reconcile-schedule",
+  { every: 5 * 60 * 1000 },
+  { name: "reconcile", data: { kind: "reconcile" } },
+);

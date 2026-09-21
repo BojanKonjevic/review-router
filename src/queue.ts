@@ -6,7 +6,7 @@ if (!process.env.REDIS_URL) throw new Error("REDIS_URL is not defined");
 export const redis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
 });
-export const prEvents = new Queue<PrEventJob>("pr-events", {
+export const prEvents = new Queue<PrEventJob | ReconcileJob>("pr-events", {
   connection: redis,
 });
 
@@ -18,4 +18,8 @@ export interface PrEventJob {
   title: string;
   action: string;
   body: string | null;
+}
+
+export interface ReconcileJob {
+  kind: "reconcile";
 }
