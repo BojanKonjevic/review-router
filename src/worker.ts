@@ -27,7 +27,7 @@ async function processor(job: Job<PrEventJob>) {
         .select()
         .from(repos)
         .where(eq(repos.name, job.data.repo));
-      if (!repo[0]) throw new Error("Repo not found.");
+      if (!repo) throw new Error("Repo not found.");
       const pr = await db
         .select()
         .from(pullRequests)
@@ -64,15 +64,15 @@ async function processor(job: Job<PrEventJob>) {
       .update(reviewers)
       .set({ load: reviewer[0].load + 1 })
       .where(eq(reviewers.id, reviewer[0].id));
-    const [repo] = await db
+    const repo = await db
       .select()
       .from(repos)
       .where(eq(repos.name, job.data.repo));
-    if (!repo) throw new Error("Repo row missing");
+    if (!repo) throw new Error("Repo not found");
     await db
       .insert(pullRequests)
       .values({
-        repoId: repo.id,
+        repoId: repo[0].id,
         number: job.data.number,
         title: job.data.title,
         body: job.data.body,
