@@ -5,11 +5,24 @@ import { deliveries, pullRequests, repos, reviewers } from "./schema.js";
 import { randomUUID } from "node:crypto";
 import { eq, and, count } from "drizzle-orm";
 
+async function takeLock(): Promise<string | null> {
+  const token = randomUUID();
+  const locked = await redis.set("lock:assign", token, "PX", 5000, "NX");
+  return locked ? token : null;
+}
+async function releaseLock(token: string) {
+  await redis.eval(
+    "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
+    1,
+    "lock:assign",
+    token,
+  );
+}
+
 async function processor(job: Job<PrEventJob | ReconcileJob>) {
   if ("kind" in job.data) {
-    const token = randomUUID();
-    const locked = await redis.set("lock:assign", token, "PX", 5000, "NX");
-    if (!locked) throw new Error("Failed to acquire lock");
+    const token = await takeLock();
+    if (!token) throw new Error("Failed to acquire lock");
     try {
       const rows = await db
         .select({
@@ -28,12 +41,7 @@ async function processor(job: Job<PrEventJob | ReconcileJob>) {
           .where(eq(reviewers.id, r.id));
       }
     } finally {
-      await redis.eval(
-        "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
-        1,
-        "lock:assign",
-        token,
-      );
+      await releaseLock(token);
     }
     return;
   }
@@ -49,10 +57,8 @@ async function processor(job: Job<PrEventJob | ReconcileJob>) {
     return;
   }
   console.log(job.data);
-  await db.insert(repos).values({ name: job.data.repo }).onConflictDoNothing();
-  const token = randomUUID();
-  const locked = await redis.set("lock:assign", token, "PX", 5000, "NX");
-  if (!locked) throw new Error("Failed to acquire lock");
+  const token = await takeLock();
+  if (!token) throw new Error("Failed to acquire lock");
   try {
     if (job.data.action === "closed") {
       const repo = await db
@@ -119,12 +125,7 @@ async function processor(job: Job<PrEventJob | ReconcileJob>) {
         },
       });
   } finally {
-    await redis.eval(
-      "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end",
-      1,
-      "lock:assign",
-      token,
-    );
+    await releaseLock(token);
   }
 }
 
