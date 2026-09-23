@@ -1,4 +1,11 @@
-import { integer, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  boolean,
+} from "drizzle-orm/pg-core";
 
 export const repos = pgTable("repos", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
@@ -35,4 +42,10 @@ export const reviewers = pgTable("reviewers", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull().unique(),
   load: integer("load").notNull().default(0),
+});
+
+export const installations = pgTable("installations", {
+  id: integer("id").primaryKey(),
+  account: text("account").notNull(),
+  removed: boolean("removed").notNull().default(false),
 });
