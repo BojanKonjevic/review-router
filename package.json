@@ -22,9 +22,11 @@
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.4",
     "ioredis": "^6.0.0",
+    "jsonwebtoken": "^9.0.3",
     "postgres": "^3.4.9"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.5.1",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.13",
