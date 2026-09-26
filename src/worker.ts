@@ -1,9 +1,16 @@
 import { type PrEventJob, redis, prEvents, ReconcileJob } from "./queue.js";
 import { type Job, Worker } from "bullmq";
 import { db } from "./db/index.js";
-import { deliveries, pullRequests, repos, reviewers } from "./schema.js";
+import {
+  deliveries,
+  installations,
+  pullRequests,
+  repos,
+  reviewers,
+} from "./schema.js";
 import { randomUUID } from "node:crypto";
 import { eq, and, count } from "drizzle-orm";
+import { getCachedInstallToken, requestReview } from "./github.js";
 
 async function takeLock(): Promise<string | null> {
   const token = randomUUID();
@@ -56,53 +63,65 @@ async function processor(job: Job<PrEventJob | ReconcileJob>) {
   if (inserted.count === 0) {
     return;
   }
-  console.log(job.data);
+  const account = job.data.repo.split("/")[0];
+  const [install] = await db
+    .select()
+    .from(installations)
+    .where(
+      and(eq(installations.account, account), eq(installations.removed, false)),
+    );
+  if (!install) {
+    console.log(`No installation for ${account}`);
+    return;
+  }
+  await db.insert(repos).values({ name: job.data.repo }).onConflictDoNothing();
+  const ghToken = await getCachedInstallToken(install.id);
   const token = await takeLock();
   if (!token) throw new Error("Failed to acquire lock");
   try {
     if (job.data.action === "closed") {
-      const repo = await db
+      const [repo] = await db
         .select()
         .from(repos)
         .where(eq(repos.name, job.data.repo));
-      if (!repo) throw new Error("Repo not found.");
-      const pr = await db
+      if (!repo) return;
+      const [pr] = await db
         .select()
         .from(pullRequests)
         .where(
           and(
-            eq(pullRequests.repoId, repo[0].id),
+            eq(pullRequests.repoId, repo.id),
             eq(pullRequests.number, job.data.number),
           ),
         );
-      if (!pr || !pr[0].reviewerId || pr[0].state === "closed") return;
+      if (!pr || !pr.reviewerId || pr.state === "closed") return;
       await db
         .update(pullRequests)
         .set({ state: "closed" })
-        .where(eq(pullRequests.id, pr[0].id));
-      const rev = await db
+        .where(eq(pullRequests.id, pr.id));
+      const [rev] = await db
         .select()
         .from(reviewers)
-        .where(eq(reviewers.id, pr[0].reviewerId));
+        .where(eq(reviewers.id, pr.reviewerId));
       if (rev) {
         await db
           .update(reviewers)
-          .set({ load: rev[0].load - 1 })
-          .where(eq(reviewers.id, pr[0].reviewerId));
+          .set({ load: rev.load - 1 })
+          .where(eq(reviewers.id, pr.reviewerId));
       }
       return;
     }
-    const reviewer = await db
+    const [reviewer] = await db
       .select()
       .from(reviewers)
       .orderBy(reviewers.load)
       .limit(1);
-    if (!reviewer[0]) throw new Error("No reviewers");
+    if (!reviewer) throw new Error("No reviewers");
     await db
       .update(reviewers)
-      .set({ load: reviewer[0].load + 1 })
-      .where(eq(reviewers.id, reviewer[0].id));
-    const repo = await db
+      .set({ load: reviewer.load + 1 })
+      .where(eq(reviewers.id, reviewer.id));
+    const [repo] = await db
       .select()
       .from(repos)
       .where(eq(repos.name, job.data.repo));
@@ -110,20 +129,30 @@ async function processor(job: Job<PrEventJob | ReconcileJob>) {
     await db
       .insert(pullRequests)
       .values({
-        repoId: repo[0].id,
+        repoId: repo.id,
         number: job.data.number,
         title: job.data.title,
         body: job.data.body,
-        reviewerId: reviewer[0].id,
+        reviewerId: reviewer.id,
       })
       .onConflictDoUpdate({
         target: [pullRequests.repoId, pullRequests.number],
         set: {
           title: job.data.title,
           body: job.data.body,
-          reviewerId: reviewer[0].id,
+          reviewerId: reviewer.id,
         },
       });
+    try {
+      await requestReview(
+        job.data.repo,
+        job.data.number,
+        reviewer.name,
+        ghToken,
+      );
+    } catch (err) {
+      console.log(`Review request skipped: ${err}`);
+    }
   } finally {
     await releaseLock(token);
   }

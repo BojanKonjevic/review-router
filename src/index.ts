@@ -7,6 +7,8 @@ import Fastify, {
 } from "fastify";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { type PrEventJob, prEvents } from "./queue.js";
+import { db } from "./db/index.js";
+import { installations } from "./schema.js";
 
 const port: number = Number(process.env.PORT ?? 3000);
 const app: FastifyInstance = Fastify({ logger: true });
@@ -33,11 +35,44 @@ app.post("/webhooks/github", async (req: FastifyRequest, res: FastifyReply) => {
     return res.code(401).send({ ok: false });
   }
   if (timingSafeEqual(Buffer.from(expected), Buffer.from(received))) {
-    if (event !== "pull_request" || typeof delivery !== "string") {
+    if (
+      (event !== "pull_request" && event !== "installation") ||
+      typeof delivery !== "string"
+    ) {
       app.log.info({ event, delivery });
       return res.code(200).send({ ok: true });
     }
     const body = JSON.parse(rawBody.toString());
+    if (event === "installation") {
+      const action = body.action;
+      const installId = body.installation.id;
+      const account = body.installation.account.login;
+      if (action === "created") {
+        await db
+          .insert(installations)
+          .values({ id: installId, account: account, removed: false })
+          .onConflictDoUpdate({
+            target: installations.id,
+            set: {
+              account: account,
+              removed: false,
+            },
+          });
+      } else if (action === "deleted") {
+        await db
+          .insert(installations)
+          .values({ id: installId, account: account, removed: true })
+          .onConflictDoUpdate({
+            target: installations.id,
+            set: {
+              account: account,
+              removed: true,
+            },
+          });
+      }
+      return res.code(200).send({ ok: true });
+    }
+
     const prEventJob: PrEventJob = {
       deliveryId: delivery,
       event: event,
