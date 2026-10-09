@@ -43,6 +43,13 @@ app.post("/webhooks/github", async (req: FastifyRequest, res: FastifyReply) => {
       return res.code(200).send({ ok: true });
     }
     const body = JSON.parse(rawBody.toString());
+    if (event === "pull_request") {
+      const allowed = ["opened", "reopened", "synchronize", "closed"];
+      if (!allowed.includes(body.action)) {
+        app.log.info({ event, delivery, action: body.action, skipped: true });
+        return res.code(200).send({ ok: true });
+      }
+    }
     if (event === "installation") {
       const action = body.action;
       const installId = body.installation.id;
